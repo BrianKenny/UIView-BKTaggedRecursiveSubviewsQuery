@@ -46,7 +46,7 @@
 
 
 #ifndef BK_TAG_SUBVIEW_NO_CONVENIENCE_METHODS
-- (NSMutableDictionary *)tags;
+- (NSArray *)tags;
 - (UIView *)addTags:(NSString *)tags;
 - (UIView *)clearTags:(NSString *)tags;
 - (NSArray *)viewQuery:(NSString *)query, ... ;

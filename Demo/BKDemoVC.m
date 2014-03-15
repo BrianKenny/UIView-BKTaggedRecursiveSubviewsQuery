@@ -33,6 +33,10 @@
 
 
 @implementation BKDemoVC
+{
+    UIView *rootVw_;
+    UIView *bottomRightVw_;
+}
 
 - (void)viewDidLoad
 {
@@ -48,41 +52,70 @@
 
 - (void)viewWillAppear:(BOOL)animated
 {
-    UIView *vw = [[UIView alloc] initWithFrame:CGRectMake(0, 30, 320, 320+PAD)];
-    vw.backgroundColor = [self randomColor];
-    [self.view addSubview:vw];
-    [self addViewsToView:vw size:vw.frame.size.width/3 across:3 depth:3 pad:PAD];
+    rootVw_ = [[UIView alloc] initWithFrame:CGRectMake(0, 30, 320, 320+PAD)];
+    rootVw_.backgroundColor = [self randomColor];
+    [self.view addSubview:rootVw_];
+    [self addViewsToView:rootVw_ size:rootVw_.frame.size.width/3 across:3 depth:3 pad:PAD];
 
     [[[UIAlertView alloc] initWithTitle:@"Instructions"
-                                message:@"Each view in the grid is tagged with 'x_is_#' and 'y_is_#' at creation.\n\nViews with a 't' are UITextLabels.\n\nThe %p preidcate tests for a strongly red background color.\n\n\nTap the buttons to select views matching the queries."
+                                message:@"Each view in the grid is tagged with 'x_is_#' and 'y_is_#' at creation.\n\nViews with a 'L' are UILabels.\n\nThe '%p' preidcate tests for a strongly red background color.\n\nAll queries are from the largest colored view except 'h2:@UILabel' which is from the smallest one in the bottom right corner.\n\nTap the buttons to select views matching the queries."
                                delegate:nil
                       cancelButtonTitle:@"OK"
                       otherButtonTitles: nil] show];
-    
+
     UIButton *clearButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
     clearButton.frame =CGRectMake(5, 370, 50, 44);
     [self.view addSubview:clearButton];
     [clearButton setTitle:@"Clear" forState:UIControlStateNormal];
     [clearButton addTarget:self action:@selector(onClear) forControlEvents:UIControlEventTouchUpInside];
-    
+
+    UIButton *newButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    newButton.frame =CGRectMake(65, 370, 50, 44);
+    [self.view addSubview:newButton];
+    [newButton setTitle:@"New" forState:UIControlStateNormal];
+    [newButton addTarget:self action:@selector(onNewGrid) forControlEvents:UIControlEventTouchUpInside];
+
+
     UIButton *rightButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-    rightButton.frame =CGRectMake(70, 370, 100, 44);
+    rightButton.frame =CGRectMake(130, 370, 50, 44);
     [self.view addSubview:rightButton];
     [rightButton setTitle:@"x_is_2" forState:UIControlStateNormal];
     [rightButton addTarget:self action:@selector(onRight) forControlEvents:UIControlEventTouchUpInside];
 
-    
+
     UIButton *topLeftButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-    topLeftButton.frame =CGRectMake(170, 370, 150, 44);
+    topLeftButton.frame =CGRectMake(190, 370, 130, 44);
     [self.view addSubview:topLeftButton];
     [topLeftButton setTitle:@"& x_is_0 y_is_0" forState:UIControlStateNormal];
     [topLeftButton addTarget:self action:@selector(onTopLeft) forControlEvents:UIControlEventTouchUpInside];
+
+
+
 
     UIButton *labelButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
     labelButton.frame =CGRectMake(5, 405, 100, 44);
     [self.view addSubview:labelButton];
     [labelButton setTitle:@"d2:@UILabel" forState:UIControlStateNormal];
     [labelButton addTarget:self action:@selector(onLabel) forControlEvents:UIControlEventTouchUpInside];
+
+    UIButton *superButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    superButton.frame =CGRectMake(105, 405, 100, 44);
+    [self.view addSubview:superButton];
+    [superButton setTitle:@"h:@UILabel" forState:UIControlStateNormal];
+    [superButton addTarget:self action:@selector(onSuper) forControlEvents:UIControlEventTouchUpInside];
+
+    UIButton *super2Button = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    super2Button.frame =CGRectMake(200, 405, 50, 44);
+    [self.view addSubview:super2Button];
+    [super2Button setTitle:@"h2:" forState:UIControlStateNormal];
+    [super2Button addTarget:self action:@selector(onSuper2) forControlEvents:UIControlEventTouchUpInside];
+
+
+    UIButton *takeButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    takeButton.frame =CGRectMake(250, 405, 70, 44);
+    [self.view addSubview:takeButton];
+    [takeButton setTitle:@"t7:x_is_0" forState:UIControlStateNormal];
+    [takeButton addTarget:self action:@selector(onTake) forControlEvents:UIControlEventTouchUpInside];
 
     
     UIButton *complexButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
@@ -95,15 +128,48 @@
 
 - (void)onClear
 {
-    for(UIView *vw in [self.view viewQuery:@"@UIView"])
+    for(UIView *vw in [rootVw_ bk_viewQuery:@"@UIView"])
     {
         [self deselectView:vw];
     }
 }
 
+- (void)onNewGrid
+{
+    for(UIView *vw in rootVw_.subviews)
+    {
+        [vw removeFromSuperview];
+    }
+    [self addViewsToView:rootVw_ size:rootVw_.frame.size.width/3 across:3 depth:3 pad:PAD];
+}
+
 - (void)onLabel
 {
-    for(UIView *vw in [self.view bk_viewQuery:@"d2:@UILabel"])
+    for(UIView *vw in [rootVw_ bk_viewQuery:@"d2:@UILabel"])
+    {
+        [self selectView:vw];
+    }
+}
+
+-(void)onSuper
+{
+    for(UIView *vw in [bottomRightVw_ bk_viewQuery:@"h:@UILabel"])
+    {
+        [self selectView:vw];
+    }
+}
+
+-(void)onSuper2
+{
+    for(UIView *vw in [bottomRightVw_ bk_viewQuery:@"h2:"])
+    {
+        [self selectView:vw];
+    }
+}
+
+-(void)onTake
+{
+    for(UIView *vw in [rootVw_ bk_viewQuery:@"t7:x_is_0"])
     {
         [self selectView:vw];
     }
@@ -111,7 +177,7 @@
 
 - (void)onRight
 {
-    for(UIView *vw in [self.view bk_viewQuery:@"x_is_2"])
+    for(UIView *vw in [rootVw_ bk_viewQuery:@"x_is_2"])
     {
         [self selectView:vw];
     }
@@ -119,7 +185,7 @@
 
 - (void)onTopLeft
 {
-    for(UIView *vw in [self.view bk_viewQuery:@"& x_is_0 y_is_0"])
+    for(UIView *vw in [rootVw_ bk_viewQuery:@"& x_is_0 y_is_0"])
     {
         [self selectView:vw];
     }
@@ -128,7 +194,7 @@
 - (void)onComplex
 {
     NSPredicate * redPred = BK_PRED_VIEW( return [self isRedView:view]; );
-    NSArray *views = [self.view bk_viewQuery:@"d3: |  (& @UILabel x_is_0) \
+    NSArray *views = [rootVw_ bk_viewQuery:@"d3: |  (& @UILabel x_is_0) \
                                                       (& x_is_2   %p    )", redPred];
     
     for(UIView *vw in views)
@@ -156,19 +222,22 @@
             else if(r==1)
             {
                 vw =[[UILabel alloc] initWithFrame:CGRectMake(pad/.66+x*size, pad/.66+y*size, size-pad, size-pad)];
-                ((UILabel *)vw).text = @"t";
+                ((UILabel *)vw).text = @"L";
                 ((UILabel *)vw).font = [UIFont systemFontOfSize:8];
             }
             vw.backgroundColor = [self randomColor];
             [rootView addSubview:vw];
             [vw bk_addTags:[NSString stringWithFormat:@"testTag x_is_%d y_is_%d temp1 temp2", x, y]];
             [vw bk_clearTags:@"temp1 temp2"];
-            //[vw bk_addTags:[NSString stringWithFormat:@"testTag x_is_%d y_is_%d", x, y]];
             
             int newAcross = across/*-1*/;
             float newPad = pad*.66;
             int newSize = (size-pad)/newAcross;
             [self addViewsToView:vw size:newSize across:newAcross depth:depth-1 pad:newPad];
+            if(depth==1)
+            {
+                bottomRightVw_ = vw;
+            }
         }
     }
 }
@@ -226,6 +295,5 @@
                                              alpha:0.3];
     return (b*.66 > g) && (b*.66 > r) && (b > 0.66);
 }
-
 
 @end

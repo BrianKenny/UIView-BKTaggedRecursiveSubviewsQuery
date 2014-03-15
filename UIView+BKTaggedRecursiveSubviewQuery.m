@@ -30,88 +30,17 @@ static char const * const sc_BKTaggedRecursiveSubviewQueryKey =  "BKTaggedRecurs
 
 #define PRED_VIEW(blockBody)  [NSPredicate predicateWithBlock:^(UIView * view, NSDictionary *bindings){ blockBody }]
 
-#define PRED_HAS_TAG(TAG)  PRED_VIEW( return [view bk_hasTag:TAG]; )
+#define PRED_HAS_TAG(TAG)  PRED_VIEW( return viewHasTag(view, TAG); )
 #define PRED_OF_KIND(CLASS)  PRED_VIEW( return [view isKindOfClass:[CLASS class]]; )
 #define PRED_AND(PREDS) [NSCompoundPredicate andPredicateWithSubpredicates:PREDS]
 #define PRED_OR(PREDS) [NSCompoundPredicate orPredicateWithSubpredicates:PREDS]
 #define PRED_NOT(PREDS) [NSCompoundPredicate notPredicateWithSubpredicate:PREDS]
 
-#define SEPARATOR [NSCharacterSet whitespaceAndNewlineCharacterSet]
+#define SEPARATORS [NSCharacterSet whitespaceAndNewlineCharacterSet]
 
 @implementation UIView (BKTaggedRecursiveSubviewQuery)
 
-#pragma mark - Tag Methods
-
--(NSArray *)bk_tags
-{
-    NSMutableArray *tags = objc_getAssociatedObject(self, sc_BKTaggedRecursiveSubviewQueryKey);
-    return tags ? tags : @[];
-}
-
--(NSMutableArray *)bk_mutableTags
-{
-    NSMutableArray *mtags = objc_getAssociatedObject(self, sc_BKTaggedRecursiveSubviewQueryKey);
-    if (mtags == nil)
-    {
-        mtags = [[NSMutableArray alloc] init];
-        objc_setAssociatedObject(self, sc_BKTaggedRecursiveSubviewQueryKey, mtags, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    return mtags;
-}
-
-- (UIView *)bk_addTags:(NSString *)tags
-{
-    [self.bk_mutableTags addObjectsFromArray:[tags componentsSeparatedByCharactersInSet:SEPARATOR]];
-    return self;
-}
-
-- (UIView *)bk_clearTags:(NSString *)tags
-{
-    if(tags==nil)
-        objc_setAssociatedObject(self, sc_BKTaggedRecursiveSubviewQueryKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    else
-        [self.bk_mutableTags removeObjectsInArray:[tags componentsSeparatedByCharactersInSet:SEPARATOR]];
-    return self;
-}
-
-- (BOOL)bk_hasTag:(NSString *)tag
-{
-    for(NSString * viewTag in self.bk_tags)
-    {
-        if([viewTag isEqualToString:tag])
-            return YES;
-    }
-    return NO;
-}
-
-#pragma mark - Public Subview Methods
-
-- (NSMutableArray *)bk_superviewsToDepth:(int)depth withPredicate:(NSPredicate *)predicate
-{
-    NSMutableArray *array = [[NSMutableArray alloc] init];
-
-    UIView *vw = self.superview;
-    for( ; vw!= nil; depth--)
-    {
-        if(depth == 0)
-        {
-            break;
-        }
-        if([predicate evaluateWithObject:vw])
-        {
-            [array addObject:vw];
-        }
-        vw = vw.superview;
-    }
-    return array;
-}
-
-- (NSMutableArray *)bk_subviewsToDepth:(int)depth withPredicate:(NSPredicate *)predicate
-{
-    NSMutableArray *array = [[NSMutableArray alloc] init];
-    [self bk_subviewsToDepth:depth usingArray:array withPredicate:predicate];
-    return array;
-}
+#pragma mark - Public Methods
 
 - (NSArray *)bk_viewQuery:(NSString *)query, ...
 {
@@ -127,50 +56,203 @@ static char const * const sc_BKTaggedRecursiveSubviewQueryKey =  "BKTaggedRecurs
         [predSubstitutionAry addObject:pred];
     }
     va_end(args);
-    return [self bk_viewQuery_internal:query predicateList:predSubstitutionAry];
+    return viewQuery_internal(self, query, predSubstitutionAry);
 }
+
+-(NSArray *)bk_tags
+{
+    NSMutableArray *tags = objc_getAssociatedObject(self, sc_BKTaggedRecursiveSubviewQueryKey);
+    return tags ? tags : @[];
+}
+
+- (UIView *)bk_addTags:(NSString *)tags
+{
+    [self.bk_mutableTags addObjectsFromArray:[tags componentsSeparatedByCharactersInSet:SEPARATORS]];
+    return self;
+}
+
+- (UIView *)bk_clearTags:(NSString *)tags
+{
+    if(tags==nil)
+        objc_setAssociatedObject(self, sc_BKTaggedRecursiveSubviewQueryKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    else
+        [self.bk_mutableTags removeObjectsInArray:[tags componentsSeparatedByCharactersInSet:SEPARATORS]];
+    return self;
+}
+
+#pragma mark - Un-prefixed Public Methods
+
+#ifndef BK_TAG_SUBVIEW_NO_CONVENIENCE_METHODS
+- (NSArray *)tags
+{
+    return self.bk_tags;
+}
+
+- (UIView *)addTags:(NSString *)tags
+{
+    return [self bk_addTags:tags];
+}
+
+- (UIView *)clearTags:(NSString *)tags
+{
+    return [self bk_clearTags:tags];
+}
+
+- (NSArray *)viewQuery:(NSString *)query, ...
+{
+    //get vararg predicates for use substitution with %p tokens
+    NSError *error = nil;
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"%p" options:NSRegularExpressionCaseInsensitive error:&error];
+    int predCt = [regex numberOfMatchesInString:query options:0 range:NSMakeRange(0, query.length)];
+    NSMutableArray * predSubstitutionAry = [[NSMutableArray alloc] initWithCapacity:predCt];
+    va_list args;
+    va_start(args, query);
+    for( int i = 0; i < predCt; i++ ) {
+        NSPredicate *pred = va_arg(args, NSPredicate *);
+        [predSubstitutionAry addObject:pred];
+    }
+    va_end(args);
+    return viewQuery_internal(self, query, predSubstitutionAry);
+}
+#endif
+
 
 #pragma mark - Private Methods
 
-- (NSArray *)bk_viewQuery_internal:(NSString *)query predicateList:(NSMutableArray *)predSubstitutionAry
+-(NSMutableArray *)bk_mutableTags
 {
+    NSMutableArray *mtags = objc_getAssociatedObject(self, sc_BKTaggedRecursiveSubviewQueryKey);
+    if (mtags == nil)
+    {
+        mtags = [[NSMutableArray alloc] init];
+        objc_setAssociatedObject(self, sc_BKTaggedRecursiveSubviewQueryKey, mtags, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return mtags;
+}
+
+#pragma mark - Static C functions
+
+static BOOL viewHasTag(UIView *view, NSString * tag)
+{
+    for(NSString * viewTag in view.bk_tags)
+    {
+        if([viewTag isEqualToString:tag])
+            return YES;
+    }
+    return NO;
+}
+
+static NSMutableArray * superviewsToDepth(UIView *view, int depth, int take, NSPredicate *predicate)
+{
+    NSMutableArray *array = [[NSMutableArray alloc] init];
     
+    UIView *vw = view.superview;
+    for( ; vw!= nil && depth > 0 && array.count<take ; depth--)
+    {
+        if([predicate evaluateWithObject:vw])
+        {
+            [array addObject:vw];
+        }
+        vw = vw.superview;
+    }
+    return array;
+}
+
+static NSMutableArray * subviewsToDepth(UIView *view, int depth, int take, NSPredicate *predicate)
+{
+    NSMutableArray *matches = [[NSMutableArray alloc] init];
+    if(take == INT_MAX)
+    {
+        depthFirstSubviewsMatchingPredicate(view, predicate, depth, matches);
+    }
+    else
+    {
+        breadthFirstSubviewsMatchingPredicate([view.subviews mutableCopy], predicate, depth, take, matches);
+    }
+    return matches;
+}
+
+static NSArray *viewQuery_internal(UIView *view, NSString *query, NSMutableArray *predSubstitutionAry)
+{
     // ensure ! prefix has spaces around it
     query = [query stringByReplacingOccurrencesOfString:@"!" withString:@" ! "];
     
-    // "d##:"  recursion depth prefix
-    BOOL up = [query hasPrefix:@"h"] || [query hasPrefix:@"u"];
-    int depth = -1;
-    NSRange range = [query rangeOfString:@":"];
-    if(range.length>0)
+    // take and recursion depth prefix. "t# d#:"
+    BOOL up = NO;
+    int take = INT_MAX;
+    int depth = INT_MAX;
+    NSRange prefixRange = [query rangeOfString:@":"];
+    if(prefixRange.length>0)
     {
-        NSString *depthStr = [query substringWithRange:NSMakeRange(1, range.location-1)];
-        depth = depthStr.length>0 ? [depthStr intValue] : -1;
-        query = [query substringFromIndex:range.location+1];
+        NSString *prefixStr = [query substringToIndex:prefixRange.location];
+        NSArray *prefixAry = [prefixStr componentsSeparatedByCharactersInSet:SEPARATORS];
+
+        for (NSString *subStr in prefixAry)
+        {
+            if([subStr hasPrefix:@"t"])
+            {
+                NSString *takeStr = [subStr substringWithRange:NSMakeRange(1, subStr.length-1)];
+                take = takeStr.length>0 ? [takeStr intValue] : INT_MAX;
+            }
+            else if([subStr hasPrefix:@"h"] || [subStr hasPrefix:@"u"] || [subStr hasPrefix:@"d"] )
+            {
+                up = ![subStr hasPrefix:@"d"];
+                NSString *depthStr = [subStr substringWithRange:NSMakeRange(1, subStr.length-1)];
+                depth = depthStr.length>0 ? [depthStr intValue] : INT_MAX;
+            }
+        }
+
+        query = [query substringFromIndex:prefixRange.location+1];
     }
-    
+
     NSArray *predAry = queryStrToPredAry(query, predSubstitutionAry);
-    assert(predAry.count == 1);
-    return up ? [self bk_superviewsToDepth:depth withPredicate:predAry[0]]
-              : [self bk_subviewsToDepth:depth withPredicate:predAry[0]];
+    if(predAry == nil || predAry.count != 1)
+    {
+        assert(query.length==0);                //if it's an empty string
+        predAry = @[PRED_VIEW( return YES;)];   //match all
+    }
+    return up ? superviewsToDepth(view, depth, take, predAry[0])
+              : subviewsToDepth(view, depth, take, predAry[0]);
 }
 
-//! Recursive subview enumeration filtered by predicate. Passes mutable array for results to avoid returning & joing lots of arrays
-- (void)bk_subviewsToDepth:(int)depth usingArray:(NSMutableArray *)returnValuesArray withPredicate:(NSPredicate *)predicate
+//! Depth first subview search filtered by predicate. Results added to matches.
+static void depthFirstSubviewsMatchingPredicate(UIView *view, NSPredicate *predicate, int depth, NSMutableArray *returnValuesArray)
 {
     if(depth==0)
         return;
-    [returnValuesArray addObjectsFromArray:[self.subviews filteredArrayUsingPredicate:predicate]];
-    for(UIView *subview in self.subviews)
+    [returnValuesArray addObjectsFromArray:[view.subviews filteredArrayUsingPredicate:predicate]];
+    for(UIView *subview in view.subviews)
     {
-        [returnValuesArray addObjectsFromArray:[subview bk_subviewsToDepth:depth-1 withPredicate:predicate]];
+        depthFirstSubviewsMatchingPredicate(subview, predicate, depth-1, returnValuesArray);
     }
 }
 
+//! Breadth first subview search filtered by predicate. Results added to matches.
+static void breadthFirstSubviewsMatchingPredicate(NSMutableArray* unprocessed, NSPredicate *predicate, int depth, int take, NSMutableArray *matches)
+{
+    if(depth==0 || unprocessed == nil || unprocessed.count==0)
+        return;
+    depth--;
 
-#pragma mark - Private C functions
+    NSMutableArray *newSet = [[NSMutableArray alloc] init];
+    for(UIView *vw in unprocessed)
+    {
+        if ([predicate evaluateWithObject:vw])
+        {
+            [matches addObject:vw];
+            if (matches.count >= take) {
+                return;
+            }
+        }
+        if (depth>0)
+        {
+            [newSet addObjectsFromArray:vw.subviews];
+        }
+    }
+    breadthFirstSubviewsMatchingPredicate(newSet, predicate, depth, take, matches);
+}
 
-NSMutableArray * convertTokenAryToPreAry(NSMutableArray *array,  NSMutableArray * predSubstitutionAry)
+static NSMutableArray * convertTokenAryToPreAry(NSMutableArray *array,  NSMutableArray * predSubstitutionAry)
 {
     for(int i=array.count-1; i>=0; i--)
     {
@@ -211,9 +293,9 @@ NSMutableArray * convertTokenAryToPreAry(NSMutableArray *array,  NSMutableArray 
     return array;
 }
 
-NSMutableArray * splitString(NSString *str)
+static NSMutableArray * splitString(NSString *str)
 {
-    NSMutableArray *array = [[str componentsSeparatedByCharactersInSet:SEPARATOR] mutableCopy];
+    NSMutableArray *array = [[str componentsSeparatedByCharactersInSet:SEPARATORS] mutableCopy];
     NSPredicate *pred =[NSPredicate predicateWithBlock:^(NSString * splitStr, NSDictionary *bindings){
         return (BOOL)([splitStr length] > 0);
     }];
@@ -221,7 +303,7 @@ NSMutableArray * splitString(NSString *str)
     return array;
 }
 
-id queryStrToPredAry(NSString * str, NSMutableArray * predSubstitutionAry)
+static id queryStrToPredAry(NSString * str, NSMutableArray * predSubstitutionAry)
 {
     //scan for a matched pair of ()s
     int open = -1;
@@ -277,41 +359,5 @@ id queryStrToPredAry(NSString * str, NSMutableArray * predSubstitutionAry)
     ret = convertTokenAryToPreAry(ret, predSubstitutionAry);
     return ret;
 }
-
-#pragma mark - Un-prefixed Public Methods
-
-#ifndef BK_TAG_SUBVIEW_NO_CONVENIENCE_METHODS
-- (NSArray *)tags
-{
-    return self.bk_tags;
-}
-
-- (UIView *)addTags:(NSString *)tags
-{
-    return [self bk_addTags:tags];
-}
-
-- (UIView *)clearTags:(NSString *)tags
-{
-    return [self bk_clearTags:tags];
-}
-
-- (NSArray *)viewQuery:(NSString *)query, ...
-{
-    //get vararg predicates for use substitution with %p tokens
-    NSError *error = nil;
-    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"%p" options:NSRegularExpressionCaseInsensitive error:&error];
-    int predCt = [regex numberOfMatchesInString:query options:0 range:NSMakeRange(0, query.length)];
-    NSMutableArray * predSubstitutionAry = [[NSMutableArray alloc] initWithCapacity:predCt];
-    va_list args;
-    va_start(args, query);
-    for( int i = 0; i < predCt; i++ ) {
-        NSPredicate *pred = va_arg(args, NSPredicate *);
-        [predSubstitutionAry addObject:pred];
-    }
-    va_end(args);
-    return [self bk_viewQuery_internal:query predicateList:predSubstitutionAry];
-}
-#endif
 
 @end

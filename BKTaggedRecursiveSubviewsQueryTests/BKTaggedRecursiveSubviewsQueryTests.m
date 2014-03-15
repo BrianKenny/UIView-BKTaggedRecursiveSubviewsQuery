@@ -44,14 +44,14 @@
     
 /*  Setup creates this view heirarchy
  
-UIView(_rootView)
-UIImageView,             UIView
-UILabel,                 UIView
-UIImageView
-UILabel
-UIImageView
-UILabel
-UITextField, UITextField, UITextField, UITextField, UITextField
+0 - UIView(_rootView)
+1 - UIImageView,             UIView
+2 - UILabel,                 UIView
+3 - UIImageView
+4 - UILabel
+5 - UIImageView
+6 - UILabel
+7 - UITextField, UITextField, UITextField, UITextField, UITextField
 */
     
     _rootView = [[UIView alloc] init];
@@ -69,9 +69,9 @@ UITextField, UITextField, UITextField, UITextField, UITextField
     
     for(int i=0; i<IMG_CT+LBL_CT; i++)
     {
-        UIView *vw2 = i%2 ? [[UILabel alloc] init]:  [[UIImageView alloc] init];
+        UIView *vw2 = i%2 ? [[UILabel alloc] init] : [[UIImageView alloc] init];
         [vw addSubview:vw2];
-        [vw2 addTags: i%2 ? @"label stuff all": @"image_vw things all"];
+        [vw2 addTags: i%2 ? @"label stuff all" : @"image_vw things all"];
         [vw2 addTags:[NSString stringWithFormat:@"depth_%d", i]];
         vw = vw2;
     }
@@ -95,21 +95,26 @@ UITextField, UITextField, UITextField, UITextField, UITextField
 {
     //Subview tag & kind
     
+    XCTAssertTrue([_rootView viewQuery:@""].count == IMG_CT+LBL_CT+TXT_CT+VW_CT, @"");
     XCTAssertTrue([_rootView viewQuery:@"label"].count == LBL_CT , @"");
     XCTAssertTrue([_rootView viewQuery:@"image_vw"].count == IMG_CT , @"");
     XCTAssertTrue([_rootView viewQuery:@"txt"].count == TXT_CT , @"");
     XCTAssertTrue([_rootView viewQuery:@"| label image_vw"].count == IMG_CT+LBL_CT , @"");
-    XCTAssertTrue([_rootView viewQuery:@"d4:| label"].count == 2 , @"");
-    XCTAssertTrue([_rootView viewQuery:@"d4:(| label image_vw)"].count == 4 , @"");
-    XCTAssertTrue([_rootView viewQuery:@"d4:(& label image_vw)"].count == 0 , @"");
-    
-
     XCTAssertTrue([_rootView viewQuery:@"@UILabel"].count == LBL_CT , @"");
     XCTAssertTrue([_rootView viewQuery:@"| @UILabel image_vw"].count == LBL_CT+IMG_CT , @"");
-    XCTAssertTrue([_rootView viewQuery:@"d4:@UILabel"].count == 2 , @"");
     XCTAssertTrue([_rootView viewQuery:@"& label @UILabel"].count == 3 , @"");
-    
-    // Predicate
+
+    XCTAssertTrue([_rootView viewQuery:@"d4:label"].count == 2 , @"");
+    XCTAssertTrue([_rootView viewQuery:@"d4:@UILabel"].count == 2 , @"");
+    XCTAssertTrue([_rootView viewQuery:@"d4:(| label image_vw)"].count == 4 , @"");
+    XCTAssertTrue([_rootView viewQuery:@"d4:(& label image_vw)"].count == 0 , @"");
+
+    XCTAssertTrue([_rootView viewQuery:@"t2:"].count == 2 , @"");
+    XCTAssertTrue([_rootView viewQuery:@"d4 t99:label"].count == 2 , @"");
+    XCTAssertTrue([_rootView viewQuery:@"t99 d4:label"].count == 2 , @"");
+    XCTAssertTrue([_rootView viewQuery:@"d4 t1:label"].count == 1 , @"");
+
+    // Subview Predicate
     
     NSPredicate * predYES = BK_PRED_VIEW( return YES; );
     NSPredicate * predSubviews = BK_PRED_VIEW( return (BOOL)(view.subviews.count>0); );
@@ -140,15 +145,25 @@ UITextField, UITextField, UITextField, UITextField, UITextField
     ary = [_rootView viewQuery:@"| (& label @UILabel) (& %p @UITextField) depth_1", predParrentIsLabel];
     XCTAssertTrue(ary.count == TXT_CT+LBL_CT+1 , @"");
 
-    //Superview
-    
-    ary = [[_rootView viewQuery:@"depth_5"][0] viewQuery:@"u:@UILabel"];
+    //Super
+
+    UIView * depth5Vw = [_rootView viewQuery:@"depth_5"][0];
+    ary = [depth5Vw viewQuery:@"u:@UILabel"];
     XCTAssertTrue(ary.count == 2 , @"");
-    
-    ary = [[_rootView viewQuery:@"depth_5"][0] viewQuery:@"u:@UIImageView"];
+
+    ary = [depth5Vw viewQuery:@"u:@UIImageView"];
     XCTAssertTrue(ary.count == 3 , @"");
-    
-    ary = [[_rootView viewQuery:@"depth_5"][0] viewQuery:@"u3:@UIView"];
+
+    ary = [depth5Vw viewQuery:@"u3:@UIView"];
+    XCTAssertTrue(ary.count == 3 , @"");
+
+    ary = [depth5Vw viewQuery:@"u3 t2:@UIView"];
+    XCTAssertTrue(ary.count == 2 , @"");
+
+    ary = [depth5Vw viewQuery:@"u3 t2:| @UIView label"];
+    XCTAssertTrue(ary.count == 2 , @"");
+
+    ary = [depth5Vw viewQuery:@"u3 t5:| @UIView label"];
     XCTAssertTrue(ary.count == 3 , @"");
 
 }
